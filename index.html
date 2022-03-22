@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <title>Document</title>
+</head>
+
+<body>
+    <div class="game">
+        <div class="sore">
+            <span class="eat">吃: </span>
+            <span class="num">0</span>
+            <span class="ga">個</span>
+        </div>
+        <!-- <div class="menu"> -->
+        <div class="menu show">
+            <div class="title">貪吃的蛇</div>
+            <div class="start-btn">Play</div>
+        </div>
+        <div class="block">
+            <div class="food" style="left: 390px; bottom: 240px;"></div>
+            <div class="snake">
+                <div class="s-body s-head" style="left: 120px; bottom: 240px;"></div>
+                <div class="s-body" style="left: 90px; bottom: 240px;"></div>
+                <div class="s-body" style="left: 60px; bottom: 240px;"></div>
+            </div>
+        </div>
+    </div>
+</body>
+
+<script>
+    jQuery(document).ready(function ($) {
+        let gameInterval = 0;
+        const gameData = {
+            sore: 0,
+            itemPositionArray: [],
+            controlStack: [],
+            snakeList: [],
+            food: '',
+            gameOver: true,
+            face: '',
+        }
+        const $snake = $('.snake');
+
+        function GameItem($e, x, y, type) {
+            this.$e = $e;
+            this.x = x;
+            this.y = y;
+            this.type = type;
+            gameData.itemPositionArray[this.x][this.y] = type;
+            this.setStyle();
+        }
+
+        GameItem.prototype.move = function (x, y) {
+            gameData.itemPositionArray[this.x][this.y] = 0;
+            this.x = x;
+            this.y = y;
+            gameData.itemPositionArray[this.x][this.y] = this.type;
+            this.setStyle();
+        }
+
+        GameItem.prototype.setStyle = function () {
+            this.$e.css('left', this.x * 30);
+            this.$e.css('bottom', this.y * 30);
+        }
+
+
+        $('.menu.show .start-btn').click(() => {
+            clickStartBtn();
+        })
+
+        // 按下開始遊戲按鈕
+        function clickStartBtn() {
+            $('.menu').removeClass('show');
+            resetGame();
+            setTimeout(() => {
+                $('.menu .title').html('Game Over')
+                $('.menu .start-btn').html('Play Again')
+            }, 200)
+            startGame();
+        }
+
+
+        // 設置遊戲參數
+        function resetGame() {
+            gameData.sore = 0;
+            gameData.itemPositionArray = Array(17).fill(0).map(x => Array(17).fill(0));
+            gameData.controlStack = [];
+            gameData.snakeList = [];
+            gameData.food = '';
+            gameData.gameOver = true;
+            gameData.face = '';
+
+            setFirstSnake();
+            setFirstFood();
+
+
+            // 設置蛇
+            function setFirstSnake() {
+                $snake.html(`<div class="s-body s-head" data-x="4" data-y="8"></div>
+                <div class="s-body" data-x="3" data-y="8"></div>
+                <div class="s-body" data-x="2" data-y="8"></div>`)
+                $snake.data('face', null);
+                $snake.attr('data-face', null);
+
+                // 設定body 位置
+                const $sBody = $('.s-body');
+                $sBody.each((index, e) => {
+                    const $e = $(e)
+                    const newSnake = new GameItem($e, $e.data('x'), $e.data('y'), 'snake');
+                    gameData.snakeList.push(newSnake);
+                });
+            }
+
+            // 設置食物
+            function setFirstFood() {
+                const $food = $('.food');
+                gameData.food = new GameItem($food, 13, 8, 'food');
+            }
+
+            $('.sore .num').html(0);
+        }
+
+        // 開始遊戲
+        function startGame() {
+            gameData.gameOver = false;
+            // 每0.1秒判斷一次蛇的移動
+            gameInterval = setInterval(() => {
+                gameData.face && move();
+            }, 100)
+        }
+
+        // 移動
+        function move() {
+            // 下一個蛇頭的位置
+            const nextSnakeHeardPosition = getNextSnakeHeardPosition();
+            checkNextSnekeTeach(nextSnakeHeardPosition);
+            if (gameData.gameOver) return;
+
+            // 設定蛇一節一節的身體移動
+            let nextSnakeBody = { x: 0, y: 0 }
+            gameData.snakeList.some((item, index) => {
+                if (index === 0) {
+                    nextSnakeBody = { x: item.x, y: item.y };
+                    item.move(item.x + nextSnakeHeardPosition.x, item.y + nextSnakeHeardPosition.y);
+                    return false;
+                }
+                const beforeMovePosition = { x: item.x, y: item.y };
+                item.move(nextSnakeBody.x, nextSnakeBody.y)
+                nextSnakeBody = beforeMovePosition;
+
+            });
+
+            // 取得下一個蛇頭的位置
+            function getNextSnakeHeardPosition() {
+                let face = gameData.face;
+                if (gameData.controlStack[0]) {
+                    face = gameData.controlStack[0];
+                    gameData.controlStack.shift();
+                }
+
+                switch (face) {
+                    case 'l':
+                        return {
+                            x: -1, y: 0
+                        }
+                    case 'r':
+                        return {
+                            x: 1, y: 0
+                        }
+                    case 't':
+                        return {
+                            x: 0, y: 1
+                        }
+                    case 'b':
+                        return {
+                            x: 0, y: -1
+                        }
+                    default:
+                        return {
+                            x: 0, y: 0
+                        }
+                }
+            }
+        }
+
+
+        // 檢查碰撞
+        function checkNextSnekeTeach(nextSnakeHeardPosition) {
+            let x = gameData.snakeList[0].x + nextSnakeHeardPosition.x;
+            let y = gameData.snakeList[0].y + nextSnakeHeardPosition.y;
+
+            // 撞牆死
+            if (x === -1 || x === 17 || y === -1 || y === 17) {
+                gameOver();
+                // 撞到自己死
+            } else if (gameData.itemPositionArray[x][y] === 'snake') {
+                gameOver();
+                // 吃到好吃的食物
+            } else if (gameData.itemPositionArray[x][y] === 'food') {
+                eatting();
+            }
+        }
+
+        // 吃到食物
+        function eatting() {
+            lastSnake = gameData.snakeList[0];
+
+            $snake.append('<div class="s-body"></div>');
+            gameData.snakeList.push(new GameItem($snake.children().last(), lastSnake.x, lastSnake.y, 'snake'));
+
+            // 設置隨機食物座標
+            let rendomX = Math.floor(Math.random() * 16);
+            let rendomY = Math.floor(Math.random() * 16);
+            while (gameData.itemPositionArray[rendomX][rendomY] !== 0) {
+                rendomX = Math.floor(Math.random() * 16);
+                rendomY = Math.floor(Math.random() * 16);
+            }
+
+            setTimeout(() => {
+                gameData.food.move(rendomX, rendomY);
+                gameData.sore += 1;
+                $('.sore .num').html(gameData.sore);
+            }, 50)
+        }
+
+        // 鍵盤事件
+        function goRocket(e) {
+            if (gameData.gameOver && (e.keyCode === 32 || e.keyCode === 13)) {
+                clickStartBtn();
+            }
+
+            const faceByKey = ['l', 't', 'r', 'b'];
+            const face = gameData.face;
+            const willFace = faceByKey[e.keyCode - 37];
+            if (!willFace || gameData.gameOver) return;
+            if ((willFace === 'r' && face === 'l') ||
+                (willFace === 'l' && face === 'r') ||
+                (willFace === 'l' && !face) ||
+                (willFace === 't' && face === 'b') ||
+                (willFace === 'b' && face === 't')
+            ) return;
+
+            gameData.controlStack.push(willFace);
+            gameData.face = willFace;
+            $snake.attr('data-face', willFace);
+        }
+        document.body.addEventListener('keydown', goRocket, false) //偵測按下按鍵的
+
+        // 死亡
+        function gameOver() {
+            gameData.gameOver = true;
+            $('.menu').addClass('show');
+            clearInterval(gameInterval);
+        }
+    })
+</script>
+
+<style>
+    body {
+        font-family: sans-serif;
+        background-color: #ccc;
+    }
+
+    .game {
+        position: fixed;
+        top: calc(50% - 255px);
+        left: calc(50% - 255px);
+        display: inline-block;
+        width: 510px;
+        height: 510px;
+        background-color: #eee;
+    }
+
+    .sore {
+        margin-top: -38px;
+        background-color: #333;
+        color: #fefefe;
+        text-align: center;
+        padding: .25rem 0;
+        font-size: 1.4rem;
+        font-weight: bold;
+    }
+
+    .menu {
+        display: flex;
+        align-items: center;
+        position: fixed;
+        justify-content: center;
+        flex-direction: column;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        transition: all .3s;
+        background-color: rgba(0, 0, 0, .7);
+        z-index: 10;
+        opacity: 0;
+    }
+
+    .menu.show {
+        opacity: 1;
+    }
+
+    .menu .title {
+        color: #fefefe;
+        font-size: 2.4rem;
+        font-weight: bold;
+        letter-spacing: 0.2em;
+    }
+
+    .menu .start-btn {
+        color: #fefefe;
+        margin-top: 2rem;
+        padding: 0.5rem 4rem;
+        border-radius: 1rem;
+        letter-spacing: 0.1em;
+        font-size: 1.2rem;
+        background-color: #111;
+        transition: all .3s;
+    }
+
+    .menu .start-btn:hover {
+        background-color: #040404;
+        color: #fff;
+        cursor: pointer;
+        box-shadow: 2px 4px rgba(0, 0, 0, .15);
+    }
+
+    .block {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background-image: linear-gradient(45deg, #aaa 25%, transparent 25%, transparent 75%, #aaa 75%, #aaa),
+            linear-gradient(45deg, #aaa 26%, transparent 26%, transparent 74%, #aaa 74%, #aaa);
+        background-position: 0 0, 30px 30px;
+        background-size: 60px 60px;
+    }
+
+    .food {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        background-color: red;
+        position: absolute;
+        left: 360px;
+        border-radius: 50%;
+        animation-duration: 0.85s;
+        animation-name: slidein;
+        animation-iteration-count: infinite;
+    }
+
+    .snake.die .s-body {
+        background-color: #474747;
+    }
+
+    .s-body {
+        display: inline-block;
+        width: 28px;
+        height: 28px;
+        margin: 1px;
+        background-color: #335500;
+        position: absolute;
+        transition: all 0.1s;
+        transition-timing-function: linear;
+    }
+
+    .s-head {
+        border-radius: 0 38.5% 38.5% 0;
+    }
+
+    .snake[data-face='r'] .s-head {
+        border-radius: 0 38.5% 38.5% 0;
+    }
+
+    .snake[data-face='t'] .s-head {
+        border-radius: 38.5% 38.5% 0 0;
+    }
+
+    .snake[data-face='b'] .s-head {
+        border-radius: 0 0 38.5% 38.5%;
+    }
+
+    .snake[data-face='l'] .s-head {
+        border-radius: 38.5% 0 0 38.5%;
+    }
+
+    @keyframes slidein {
+        0% {
+            transform: scale(0.75);
+        }
+
+        50% {
+            transform: scale(0.92);
+        }
+
+        100% {
+            transform: scale(0.75);
+        }
+    }
+</style>
+
+</html>
